@@ -27,3 +27,5 @@ def calculer_mensualite_pret(input_str: str) -> str:
     K, r, n = float(c), float(t)/100/12, int(d)
     M = K * (r * (1+r)**n) / ((1+r)**n - 1)
     return f"Mensualité : {M:.2f}€/mois | Coût total : {M*n:,.2f}€"
+
+ 
