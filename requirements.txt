@@ -1,0 +1,14 @@
+langchain-core==1.2.14
+langchain-openai==1.1.10
+langchain-community==0.4.1
+langchain-classic==1.0.1
+python-dotenv==1.2.1
+requests
+streamlit==1.54.0
+wikipedia==1.4.0
+langchain-tavily==0.2.17
+langchain-experimental==0.4.1
+yfinance==1.2.0
+mcp==1.26.0
+langchain-mcp-adapters==0.2.2
+
