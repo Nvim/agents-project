@@ -59,7 +59,7 @@ def lister_tous_les_clients(query: str = "") -> str:
     return result
 
 if __name__ == "__main__":
-    print("== test recherche ==")
+    print("== test recherche DB ==")
     print(rechercher_client("Marie Dupont"))
     print(rechercher_client("c002"))
     print(rechercher_client("yyyy"))
