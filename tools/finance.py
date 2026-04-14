@@ -31,3 +31,14 @@ if __name__ == "__main__":
     print(obtenir_cours_action("AAPL"))
     print(obtenir_cours_action("LVMH"))
     print(obtenir_cours_action("INVALID"))
+
+def obtenir_cours_crypto(symbole: str) -> str:
+    """Retourne le cours simulé d'une crypto avec sa variation (+/-3%)."""
+    symbole = symbole.strip().upper()
+    if symbole not in CRYPTOS:
+        return f"Crypto '{symbole}' non trouvée."
+    crypto = CRYPTOS[symbole]
+    variation_pct = random.uniform(-30.0, 30.0)   # Variation aléatoire
+    cours = crypto['prix_base'] * (1 + variation_pct / 100)
+    tendance = '📈' if variation_pct >= 0 else '📉'
+    return f"{symbole} {tendance} : {cours:.2f} $ ({variation_pct:+.2f}%)"
