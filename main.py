@@ -58,6 +58,27 @@ SCENARIOS = {
         "Quelles sont les actualités Apple aujourd'hui ? "
         "Ajoute aussi un point sur les derniers résultats trimestriels de LVMH.",
     ),
+    "10": (
+        "Scénario 10 – Valorisation de portefeuille actions",
+        "Calcule la valeur de ce portefeuille : AAPL:8|MSFT:4|LVMH:2. "
+        "Donne la valeur de chaque ligne, la valeur totale et la variation globale du jour.",
+    ),
+    "11": (
+        "Scénario 11 – Python REPL (interaction filesystem)",
+        "Utilise Python pour lister récursivement tous les fichiers avec l'extension '.py' dans ce dossier."
+        "Un fichier par ligne, ajoute la date de modification et la taille du fichier pour chaque entrée.",
+    ),
+    "12": (
+        "Scénario 12 – Python REPL (statistiques)",
+        "Utilise Python REPL pour calculer la moyenne, médiane et écart-type de ces rendements mensuels (%) : "
+        "2.1, -1.4, 3.2, 0.8, -0.6, 1.9, 2.7, -2.0, 1.1, 0.4, 2.5, -0.3. "
+        "Présente les résultats avec 2 décimales.",
+    ),
+    "13": (
+        "Scénario 13 – Python REPL (simulation DCA)",
+        "Utilise Python pour simuler un DCA de 200€ par mois pendant 18 mois avec un rendement mensuel fixe de 0.6%. "
+        "Donne le capital final et le total investi.",
+    ),
 }
 
 
@@ -89,5 +110,5 @@ if __name__ == "__main__":
             interroger_agent(agent, question)
         else:
             print(
-                f"\n  Choix invalide '{choix}'. Entrez un numéro entre 1 et 9, ou 'quit'."
+                f"\n  Choix invalide '{choix}'. Entrez un numéro entre 1 et 13, ou 'quit'."
             )
