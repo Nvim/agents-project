@@ -1,67 +1,142 @@
-# Simulation d'une base de données clients et produits
+import os
+from typing import Any
 
-CLIENTS = {
-    "C001": {
-        "nom": "Marie Dupont",
-        "email": "marie.dupont@email.fr",
-        "ville": "Paris",
-        "solde_compte": 15420.50,
-        "type_compte": "Premium",
-        "date_inscription": "2021-03-15",
-        "achats_total": 8750.00
-    },
-    "C002": { "nom": "Jean Martin",    "solde_compte": 3200.00,  "type_compte": "Standard" },
-    "C003": { "nom": "Sophie Bernard", "solde_compte": 28900.00, "type_compte": "VIP"      },
-    "C004": { "nom": "Lucas Petit",    "solde_compte": 750.00,   "type_compte": "Standard" }
-}
+try:
+    import psycopg
+    from psycopg import Error as PsycopgError
+    from psycopg.rows import dict_row
 
-PRODUITS = {
-    "P001": { "nom": "Ordinateur portable Pro", "prix_ht": 899.00, "stock": 45  },
-    "P002": { "nom": "Souris ergonomique",       "prix_ht": 49.90,  "stock": 120 },
-    "P003": { "nom": "Bureau réglable",           "prix_ht": 350.00, "stock": 18  },
-    "P004": { "nom": "Casque audio sans fil",    "prix_ht": 129.00, "stock": 67  },
-    "P005": { "nom": "Écran 27 pouces 4K",       "prix_ht": 549.00, "stock": 30  }
-}
+    _PSYCOPG_IMPORT_ERROR: Exception | None = None
+except ImportError as exc:
+    psycopg = None
+    dict_row = None
+    PsycopgError = Exception
+    _PSYCOPG_IMPORT_ERROR = exc
+
+
+def _connect_db() -> Any:
+    if psycopg is None or dict_row is None:
+        raise RuntimeError(
+            "psycopg indisponible (libpq manquante). "
+            "Installez libpq ou psycopg[binary]."
+        ) from _PSYCOPG_IMPORT_ERROR
+
+    return psycopg.connect(
+        host=os.getenv("POSTGRES_HOST", os.getenv("DB_HOST", "localhost")),
+        port=int(os.getenv("POSTGRES_PORT", os.getenv("DB_PORT", "5432"))),
+        dbname=os.getenv("POSTGRES_DB", "vectordb"),
+        user=os.getenv("POSTGRES_USER", "postgres"),
+        password=os.getenv("POSTGRES_PASSWORD", "postgres"),
+        connect_timeout=int(os.getenv("POSTGRES_CONNECT_TIMEOUT", "5")),
+        row_factory=dict_row,
+    )
+
+
+def _fetch_one(sql: str, params: tuple[Any, ...]) -> dict[str, Any] | None:
+    with _connect_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            return cur.fetchone()
+
 
 def rechercher_client(query: str) -> str:
     """Recherche un client par nom ou par identifiant."""
     query = query.strip()
-    if query.upper() in CLIENTS:
-        client = CLIENTS[query.upper()]
-        return f"Client : {client['nom']} | Solde : {client['solde_compte']:.2f} € | Type de compte : {client['type_compte']}"
-    for cid, client in CLIENTS.items():
-        if query.lower() in client['nom'].lower():
-            return f"Client : {client['nom']} | Solde : {client['solde_compte']:.2f} € | Type de compte : {client['type_compte']}"
-    return f"Aucun client trouvé pour : '{query}'"
+    if not query:
+        return "Aucun client trouvé pour : ''"
+
+    try:
+        client = _fetch_one(
+            """
+            SELECT nom, solde_compte, type_compte
+            FROM clients
+            WHERE id_client = %s
+            """,
+            (query.upper(),),
+        )
+
+        if client is None:
+            client = _fetch_one(
+                """
+                SELECT nom, solde_compte, type_compte
+                FROM clients
+                WHERE nom ILIKE %s
+                ORDER BY id_client
+                LIMIT 1
+                """,
+                (f"%{query}%",),
+            )
+
+        if client is None:
+            return f"Aucun client trouvé pour : '{query}'"
+
+        return (
+            f"Client : {client['nom']} | Solde : {client['solde_compte']:.2f} € "
+            f"| Type de compte : {client['type_compte']}"
+        )
+    except (PsycopgError, RuntimeError) as exc:
+        return f"Erreur base de données (clients) : {exc.__class__.__name__}"
+
 
 def rechercher_produit(query: str) -> str:
     """Recherche un produit par nom ou identifiant. Retourne prix HT, TVA, prix TTC, stock."""
     query = query.strip()
-    if query.upper() in PRODUITS:
-        produit = PRODUITS[query.upper()]
-        tva = produit['prix_ht'] * 0.20
-        prix_ttc = produit['prix_ht'] + tva
-        return (f"Produit : {produit['nom']} | Prix HT : {produit['prix_ht']:.2f} € "
-                f"| TVA : {tva:.2f} € | Prix TTC : {prix_ttc:.2f} € | Stock : {produit['stock']}")
-    for pid, produit in PRODUITS.items():
-        if query.lower() in produit['nom'].lower():
-            tva = produit['prix_ht'] * 0.20
-            prix_ttc = produit['prix_ht'] + tva
-            return (f"Produit : {produit['nom']} | Prix HT : {produit['prix_ht']:.2f} € "
-                    f"| TVA : {tva:.2f} € | Prix TTC : {prix_ttc:.2f} € | Stock : {produit['stock']}")
-    return f"Aucun produit trouvé pour : '{query}'"
+    if not query:
+        return "Aucun produit trouvé pour : ''"
+
+    try:
+        produit = _fetch_one(
+            """
+            SELECT nom, prix_ht, stock
+            FROM produits
+            WHERE id_produit = %s
+            """,
+            (query.upper(),),
+        )
+
+        if produit is None:
+            produit = _fetch_one(
+                """
+                SELECT nom, prix_ht, stock
+                FROM produits
+                WHERE nom ILIKE %s
+                ORDER BY id_produit
+                LIMIT 1
+                """,
+                (f"%{query}%",),
+            )
+
+        if produit is None:
+            return f"Aucun produit trouvé pour : '{query}'"
+
+        tva = produit["prix_ht"] * 0.20
+        prix_ttc = produit["prix_ht"] + tva
+        return (
+            f"Produit : {produit['nom']} | Prix HT : {produit['prix_ht']:.2f} € "
+            f"| TVA : {tva:.2f} € | Prix TTC : {prix_ttc:.2f} € | Stock : {produit['stock']}"
+        )
+    except (PsycopgError, RuntimeError) as exc:
+        return f"Erreur base de données (produits) : {exc.__class__.__name__}"
+
 
 def lister_tous_les_clients(query: str = "") -> str:
     """Retourne la liste complète de tous les clients."""
-    result = "Liste des clients :\n"
-    for cid, client in CLIENTS.items():
-        result += f"  {cid} : {client['nom']} | {client['type_compte']} | Solde : {client['solde_compte']:.2f} €\n"
-    return result
+    try:
+        with _connect_db() as conn:
+            rows = conn.execute(
+                """
+                SELECT id_client, nom, type_compte, solde_compte
+                FROM clients
+                ORDER BY id_client
+                """
+            ).fetchall()
 
-if __name__ == "__main__":
-    print("== test recherche DB ==")
-    print(rechercher_client("Marie Dupont"))
-    print(rechercher_client("c002"))
-    print(rechercher_client("yyyy"))
-    print(rechercher_produit("p001"))
-    print(rechercher_produit("Souris"))
+        result = "Liste des clients :\n"
+        for row in rows:
+            result += (
+                f"  {row['id_client']} : {row['nom']} | {row['type_compte']} "
+                f"| Solde : {row['solde_compte']:.2f} €\n"
+            )
+        return result
+    except (PsycopgError, RuntimeError) as exc:
+        return f"Erreur base de données (liste clients) : {exc.__class__.__name__}"

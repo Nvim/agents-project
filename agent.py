@@ -1,12 +1,23 @@
+import os
+
+from langchain_classic import hub
+from langchain_classic.agents import AgentExecutor, create_react_agent
 from langchain_classic.tools import Tool
-from tools.database import rechercher_produit, rechercher_client
+from langchain_openai import ChatOpenAI
+from tools.calculations import (
+    calculer_interets_composes,
+    calculer_marge,
+    calculer_mensualite_pret,
+    calculer_tva,
+)
+from tools.database import rechercher_client, rechercher_produit
 from tools.finance import obtenir_cours_action, obtenir_cours_crypto
-from tools.calculations import calculer_tva, calculer_marge, calculer_interets_composes, calculer_mensualite_pret
 from tools.public_api import convertir_devise
 from tools.recommendation import recommander_produits
-from tools.text import resumer_texte, formater_rapport, extraire_mots_cles
+from tools.text import extraire_mots_cles, formater_rapport, resumer_texte
 
 # ── Outil 1 : Base de données ─────────────────────────────────────
+tools = [
 Tool(name='rechercher_client',
      func=rechercher_client,
      description='Recherche un client par nom ou ID (ex: C001). ' 'Retourne solde, type de compte, historique achats.'),
@@ -59,4 +70,41 @@ Tool(name='recommander_produits', func=recommander_produits,
                  'Entrée : budget,categorie,type_compte ex 300,Informatique,Premium. '
                  'Catégories : Informatique, Mobilier, Audio, Toutes. '
                  'Types : Standard, Premium, VIP.'),
+]
+
+def creer_agent():
+    """Crée et retourne un agent LangChain configuré."""
+ 
+    # Initialisation du LLM
+    llm = ChatOpenAI(
+        model="gpt-4o-mini",
+        temperature=0,           
+        openai_api_key=os.getenv('OPENAI_API_KEY')
+    )
+ 
+    # Chargement du prompt ReAct depuis le hub LangChain
+    # Ce prompt enseigne au LLM le cycle Thought → Action → Observation
+    prompt = hub.pull("hwchase17/react")
+    # Création de l'agent avec la stratégie ReAct
+    agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
+ 
+    # Création de l'exécuteur
+    agent_executor = AgentExecutor(
+        agent=agent,
+        tools=tools,
+        verbose=True,            # Affiche le raisonnement étape par étape
+        max_iterations=10,       # Évite les boucles infinies
+        handle_parsing_errors=True
+    )
+ 
+    return agent_executor
+
+def interroger_agent(agent, question: str):
+    """Envoie une question à l'agent et affiche la réponse finale."""
+    print(f"\n{'='*60}")
+    print(f"Question : {question}")
+    print('='*60)
+    result = agent.invoke({"input": question})
+    print(f"\nRéponse finale : {result['output']}")
+    return result
 
