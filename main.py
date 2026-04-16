@@ -79,7 +79,17 @@ SCENARIOS = {
         "Utilise Python pour simuler un DCA de 200€ par mois pendant 18 mois avec un rendement mensuel fixe de 0.6%. "
         "Donne le capital final et le total investi.",
     ),
+    "14": (
+        "Scénario 14 – Démo mémoire conversationnelle",
+        "Lance automatiquement 3 questions liées pour valider la mémoire conversationnelle.",
+    ),
 }
+
+SCENARIO_14_QUESTIONS = [
+    "Donne-moi les infos du client Sophie Bernard.",
+    "Quel produit lui recommandes-tu ?",
+    "Calcule le prix TTC et dis-moi si elle peut se le permettre.",
+]
 
 
 def afficher_menu():
@@ -104,11 +114,16 @@ if __name__ == "__main__":
         if choix in ("quit", "exit", "q"):
             print("\nAu revoir !")
             break
+        elif choix == "14":
+            titre, _ = SCENARIOS[choix]
+            print(f"\n>>> {titre}")
+            for question in SCENARIO_14_QUESTIONS:
+                interroger_agent(agent, question)
         elif choix in SCENARIOS:
             titre, question = SCENARIOS[choix]
             print(f"\n>>> {titre}")
             interroger_agent(agent, question)
         else:
             print(
-                f"\n  Choix invalide '{choix}'. Entrez un numéro entre 1 et 13, ou 'quit'."
+                f"\n  Choix invalide '{choix}'. Entrez un numéro entre 1 et 14, ou 'quit'."
             )

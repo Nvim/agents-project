@@ -4,10 +4,11 @@ import contextlib
 import io
 
 from langchain_community.tools import TavilySearchResults
-from langchain_classic import hub
-from langchain_classic.agents import AgentExecutor, create_react_agent
-from langchain_classic.tools import Tool
+from langchain_classic.agents import AgentExecutor, create_openai_tools_agent
+from langchain_classic.tools import StructuredTool, Tool
+from langchain_classic.memory import ConversationBufferMemory
 from langchain_experimental.tools import PythonREPLTool
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
 from tools.calculations import (
     calculer_interets_composes,
@@ -91,21 +92,31 @@ def _executer_code_python(code: str, python_repl_tool: PythonREPLTool) -> str:
         return f"Erreur Python : {exc.__class__.__name__}: {exc}"
 
 
+def _recommander_produits_structures(
+    budget: float, categorie: str, type_compte: str
+) -> str:
+    return recommander_produits(f"{budget},{categorie},{type_compte}")
+
+
 def creer_tools():
     """Construit la liste des outils disponibles pour l'agent."""
     tools = [
         # ── Outil 1 : Base de données ─────────────────────────────────────
+        # Les outils base de données sont en return_direct pour éviter tout fallback
+        # (ex: websearch) si la base est indisponible.
         Tool(
             name="rechercher_client",
             func=rechercher_client,
             description="Recherche un client par nom ou ID (ex: C001). "
             "Retourne solde, type de compte, historique achats.",
+            return_direct=True,
         ),
         Tool(
             name="rechercher_produit",
             func=rechercher_produit,
             description="Recherche un produit par nom ou ID. "
             "Retourne prix HT, TVA, prix TTC, stock.",
+            return_direct=True,
         ),
         # ── Outil 2 : Données financières ─────────────────────────────────
         Tool(
@@ -172,13 +183,15 @@ def creer_tools():
             description="Extrait les mots-clés d'un texte. Entrée : texte complet.",
         ),
         # ── Outil 6 : Recommandation ─────────────────────────────────────
-        Tool(
+        StructuredTool.from_function(
             name="recommander_produits",
-            func=recommander_produits,
+            func=_recommander_produits_structures,
             description="Recommandations produits. "
-            "Entrée : budget,categorie,type_compte ex 300,Informatique,Premium. "
+            "Entrée structurée : budget, categorie, type_compte. "
             "Catégories : Informatique, Mobilier, Audio, Toutes. "
             "Types : Standard, Premium, VIP.",
+            handle_tool_error=True,
+            handle_validation_error=True,
         ),
     ]
 
@@ -235,16 +248,34 @@ def creer_agent():
         model="gpt-4o-mini", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY")
     )
 
-    # Chargement du prompt ReAct depuis le hub LangChain
-    # Ce prompt enseigne au LLM le cycle Thought → Action → Observation
-    prompt = hub.pull("hwchase17/react")
-    # Création de l'agent avec la stratégie ReAct
-    agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "Tu es un assistant financier utile. Utilise les outils quand nécessaire et "
+                "appuie-toi sur l'historique de conversation pour éviter de redemander des "
+                "informations déjà connues.",
+            ),
+            MessagesPlaceholder(variable_name="chat_history", optional=True),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+
+    memory = ConversationBufferMemory(
+        memory_key="chat_history",
+        input_key="input",
+        output_key="output",
+        return_messages=True,
+    )
+
+    agent = create_openai_tools_agent(llm=llm, tools=tools, prompt=prompt)
 
     # Création de l'exécuteur
     agent_executor = AgentExecutor(
         agent=agent,
         tools=tools,
+        memory=memory,
         verbose=True,  # Affiche le raisonnement étape par étape
         max_iterations=10,  # Évite les boucles infinies
         handle_parsing_errors=True,
